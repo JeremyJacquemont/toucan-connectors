@@ -48,6 +48,7 @@ def snowflake_oauth2_datasource():
         database='database_1',
         warehouse='warehouse_1',
         query='test_query with %(foo)s and %(pokemon)s',
+        query_object={'schema': 'SHOW_SCHEMA', 'table': 'MY_TABLE', 'columns': ['col1', 'col2']},
         parameters={'foo': 'bar', 'pokemon': 'pikachu'},
     )
 
@@ -204,7 +205,7 @@ def test_retrieve_data(
     snowflake_oauth2_datasource,
 ):
     df_result: DataFrame = snowflake_oauth2_connector._retrieve_data(snowflake_oauth2_datasource)
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result)
     SnowflakeoAuth2Connector.get_connection_manager().force_clean()
 
@@ -229,7 +230,7 @@ def test_retrieve_data_slice(
     df_result: DataSlice = snowflake_oauth2_connector.get_slice(
         snowflake_oauth2_datasource, offset=0, limit=10
     )
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result.df)
     assert 11 == df_result.stats.total_returned_rows
     SnowflakeoAuth2Connector.get_connection_manager().force_clean()
@@ -255,7 +256,7 @@ def test_retrieve_data_slice_with_limit(
     df_result: DataSlice = snowflake_oauth2_connector.get_slice(
         snowflake_oauth2_datasource, offset=5, limit=3
     )
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result.df)
     assert 11 == df_result.stats.total_returned_rows
     SnowflakeoAuth2Connector.get_connection_manager().force_clean()
@@ -281,7 +282,7 @@ def test_retrieve_data_slice_too_much(
     df_result: DataSlice = snowflake_oauth2_connector.get_slice(
         snowflake_oauth2_datasource, offset=10, limit=20
     )
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result.df)
     assert 11 == df_result.stats.total_returned_rows
     SnowflakeoAuth2Connector.get_connection_manager().force_clean()

@@ -85,6 +85,7 @@ def snowflake_datasource():
         database='database_1',
         warehouse='warehouse_1',
         query='test_query with %(foo)s and %(pokemon)s',
+        query_object={'schema': 'SHOW_SCHEMA', 'table': 'MY_TABLE', 'columns': ['col1', 'col2']},
         parameters={'foo': 'bar', 'pokemon': 'pikachu'},
     )
 
@@ -254,7 +255,7 @@ def test_retrieve_data(
 ):
     df_result: DataFrame = snowflake_connector._retrieve_data(snowflake_datasource)
 
-    assert eq.call_count == 2  # +1 for each data request
+    assert eq.call_count == 3  # +1 for each data request
     assert 11 == len(df_result)
     SnowflakeConnector.get_snowflake_connection_manager().force_clean()
 
@@ -267,7 +268,7 @@ def test_retrieve_data_slice(
     eq, is_closed, close, connect, snowflake_connector, snowflake_datasource, mocker
 ):
     df_result: DataSlice = snowflake_connector.get_slice(snowflake_datasource)
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result.df)
     SnowflakeConnector.get_snowflake_connection_manager().force_clean()
 
@@ -280,7 +281,7 @@ def test_retrieve_data_slice_offset_limit(
     eq, is_closed, close, connect, snowflake_connector, snowflake_datasource, mocker
 ):
     df_result: DataSlice = snowflake_connector.get_slice(snowflake_datasource, offset=5, limit=3)
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result.df)
     assert 11 == df_result.stats.total_returned_rows
     SnowflakeConnector.get_snowflake_connection_manager().force_clean()
@@ -294,7 +295,7 @@ def test_retrieve_data_slice_too_much(
     eq, is_closed, close, connect, snowflake_connector, snowflake_datasource, mocker
 ):
     df_result: DataSlice = snowflake_connector.get_slice(snowflake_datasource, offset=10, limit=20)
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result.df)
     SnowflakeConnector.get_snowflake_connection_manager().force_clean()
 
@@ -307,7 +308,7 @@ def test_retrieve_data_fetch(
     eq, is_closed, close, connect, snowflake_connector, snowflake_datasource, mocker
 ):
     df_result = snowflake_connector._fetch_data(snowflake_datasource)
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result)
     SnowflakeConnector.get_snowflake_connection_manager().force_clean()
 
@@ -320,7 +321,7 @@ def test_retrieve_data_fetch_offset_limit(
     eq, is_closed, close, connect, snowflake_connector, snowflake_datasource, mocker
 ):
     df_result: DataSlice = snowflake_connector._fetch_data(snowflake_datasource, offset=5, limit=3)
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result)
     SnowflakeConnector.get_snowflake_connection_manager().force_clean()
 
@@ -335,7 +336,7 @@ def test_retrieve_data_fetch_too_much(
     df_result: DataSlice = snowflake_connector._fetch_data(
         snowflake_datasource, offset=10, limit=20
     )
-    assert eq.call_count == 2  # +1 select database and warehouse
+    assert eq.call_count == 3  # +1 select database and warehouse
     assert 11 == len(df_result)
     SnowflakeConnector.get_snowflake_connection_manager().force_clean()
 
@@ -697,3 +698,72 @@ def test_describe(is_closed, close, connect, mocker, snowflake_datasource, snowf
     snowflake_connector.describe(snowflake_datasource)
     mocked_common_describe.assert_called_once()
     cm.force_clean()
+
+
+def test_render_datasource():
+    snowflake_connector = SnowflakeConnector(
+        identifier='snowflake_test',
+        name='test_name',
+        authentication_method=AuthenticationMethod.PLAIN,
+        user='test_user',
+        password='test_password',
+        account='test_account',
+        default_warehouse='warehouse_1',
+    )
+
+    datasource = SnowflakeDataSource(
+        name='test_name',
+        domain='test_domain',
+        database='database_1',
+        warehouse='warehouse_1',
+        query='test_query with %(foo)s and %(pokemon)s',
+        query_object={'schema': 'SHOW_SCHEMA', 'table': 'MY_TABLE', 'columns': ['col1', 'col2']},
+        parameters={'foo': 'bar', 'pokemon': 'pikachu'},
+    )
+    key = snowflake_connector.get_cache_key(datasource)
+
+    datasource2 = SnowflakeDataSource(
+        name='test_name',
+        domain='test_domain',
+        database='database_1',
+        warehouse='warehouse_1',
+        query='test_query with %(foo)s and %(pokemon)s',
+        query_object={'schema': 'SHOW_SCHEMA', 'table': 'MY_TABLE', 'columns': ['col1', 'col2']},
+        parameters={'foo': 'bar', 'pokemon': 'pikachu', 'foo': 'bar'},
+    )
+    key2 = snowflake_connector.get_cache_key(datasource2)
+
+    assert key == key2
+
+    datasource3 = SnowflakeDataSource(
+        name='test_name',
+        domain='test_domain',
+        database='database_2',
+        warehouse='warehouse_1',
+        query='test_query with %(foo)s and %(pokemon)s',
+        query_object={'schema': 'SHOW_SCHEMA', 'table': 'MY_TABLE', 'columns': ['col1', 'col2']},
+        parameters={'foo': 'bar', 'pokemon': 'pikachu'},
+    )
+
+    key3 = snowflake_connector.get_cache_key(datasource3)
+    assert key != key3
+
+    another_snowflake_connector = SnowflakeConnector(
+        identifier='snowflake_test',
+        name='test_name',
+        authentication_method=AuthenticationMethod.PLAIN,
+        user='test_user',
+        password='test_password',
+        account='another_test_account',
+        default_warehouse='warehouse_1',
+    )
+
+    assert snowflake_connector.get_cache_key(
+        datasource
+    ) != another_snowflake_connector.get_cache_key(datasource)
+    assert snowflake_connector.get_cache_key(
+        datasource2
+    ) != another_snowflake_connector.get_cache_key(datasource2)
+    assert snowflake_connector.get_cache_key(
+        datasource3
+    ) != another_snowflake_connector.get_cache_key(datasource3)

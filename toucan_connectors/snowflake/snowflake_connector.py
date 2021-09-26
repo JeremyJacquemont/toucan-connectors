@@ -334,7 +334,7 @@ class SnowflakeConnector(ToucanConnector):
                     raise TypeError('close is not a function')
 
         connection = snowflake_connection_manager.get(
-            identifier=self.get_identifier(),
+            identifier=f'{self.get_identifier()}{database}{warehouse}',
             connect_method=connect_function,
             alive_method=alive_function,
             close_method=close_function,
@@ -401,6 +401,9 @@ class SnowflakeConnector(ToucanConnector):
         with self._get_connection(data_source.database, data_source.warehouse) as connection:
             result = SnowflakeCommon().describe(connection, data_source.query)
         return result
+
+    def _render_datasource(self, data_source: SnowflakeDataSource) -> dict:
+        return SnowflakeCommon().render_datasource(data_source)
 
     @staticmethod
     def get_snowflake_connection_manager():

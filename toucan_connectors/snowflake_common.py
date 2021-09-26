@@ -1,4 +1,5 @@
 import concurrent
+import json
 import logging
 from timeit import default_timer as timer
 from typing import Dict, List, Optional
@@ -20,7 +21,7 @@ type_code_mapping = {
     5: 'variant',
     6: 'timestamp_ltz',
     7: 'timestamp_tz',
-    8: 'timestampe_ntz',
+    8: 'timestamp_ntz',
     9: 'object',
     10: 'array',
     11: 'binary',
@@ -43,6 +44,15 @@ class SfDataSource(ToucanDataSource):
 
     query: constr(min_length=1) = Field(
         ..., description='You can write your SQL query here', widget='sql'
+    )
+
+    query_object: Dict = Field(
+        None,
+        description='An object describing a simple select query'
+        'For example '
+        '{"schema": "SHOW_SCHEMA", "table": "MY_TABLE", "columns": ["col1", "col2"]}'
+        'This field is used internally',
+        **{'ui.hidden': True},
     )
 
 
@@ -121,6 +131,17 @@ class SnowflakeCommon:
 
         return values  # do not return metadata from now
 
+    def render_datasource(self, datasource: SfDataSource) -> dict:
+        prepared_query, prepared_query_parameters = SqlQueryHelper.prepare_query(
+            datasource.query, datasource.parameters
+        )
+        return {
+            'warehouse': datasource.warehouse,
+            'database': datasource.database,
+            'query': prepared_query,
+            'parameters': prepared_query_parameters,
+        }
+
     def _execute_parallelized_queries(
         self,
         connection: SnowflakeConnection,
@@ -177,16 +198,12 @@ class SnowflakeCommon:
         limit: Optional[int] = None,
         get_row_count: bool = False,
     ) -> pd.DataFrame:
-        prepare_query: List = []
         if data_source.database != connection.database:
-            prepare_query.append(f'USE DATABASE {data_source.database}')
+            self.logger.info(f'Connection changed to use database {connection.database}')
+            self._execute_query(connection, f'USE DATABASE {data_source.database}')
         if data_source.warehouse != connection.warehouse:
-            prepare_query.append(f'USE WAREHOUSE {data_source.warehouse}')
-        if len(prepare_query) > 0:
-            self._execute_query(connection, ';'.join(prepare_query) + ';')
-            self.logger.info(
-                f'Connection changed to use database {connection.database} and warehouse {connection.warehouse}'
-            )
+            self.logger.info(f'Connection changed to use  warehouse {connection.warehouse}')
+            self._execute_query(connection, f'USE WAREHOUSE {data_source.warehouse}')
 
         ds = self._execute_parallelized_queries(
             connection, data_source.query, data_source.parameters, offset, limit, get_row_count
@@ -266,7 +283,7 @@ class SnowflakeCommon:
                     'execution_time': description_time,
                     'connector': 'snowflake',
                     'query': query,
-                    'result': describe_res,
+                    'result': json.dumps(describe_res),
                 }
             },
         )

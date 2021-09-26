@@ -198,7 +198,7 @@ class SnowflakeoAuth2Connector(ToucanConnector):
                     raise TypeError('close is not a function')
 
         connection: SnowflakeConnection = connection_manager.get(
-            identifier=self.get_identifier(),
+            identifier=f'{self.get_identifier()}{database}{warehouse}',
             connect_method=connect_function,
             alive_method=alive_function,
             close_method=close_function,
@@ -220,6 +220,9 @@ class SnowflakeoAuth2Connector(ToucanConnector):
         )
         string_uid = str(uuid.uuid3(uuid.NAMESPACE_OID, json_uid))
         return string_uid
+
+    def _render_datasource(self, data_source: SnowflakeDataSource) -> dict:
+        return SnowflakeCommon().render_datasource(data_source)
 
     def _get_warehouses(self, warehouse_name: Optional[str] = None) -> List[str]:
         with self._get_connection(warehouse=warehouse_name) as connection:

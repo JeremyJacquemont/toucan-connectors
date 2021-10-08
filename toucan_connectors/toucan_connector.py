@@ -6,7 +6,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 from functools import reduce, wraps
-from typing import Dict, Iterable, List, NamedTuple, Optional, Type
+from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Type
 
 import pandas as pd
 import tenacity as tny
@@ -32,6 +32,7 @@ class DataStats(NamedTuple):
     execution_time: Optional[float] = None  # query's execution time in ms
     conversion_time: Optional[float] = None  # Result conversion to DataFrame time
     df_memory_size: Optional[int] = None  # Dataframe's memory usage in bytes
+    others: Dict[str, Any] = {}
 
 
 class QueryMetadata(NamedTuple):
@@ -53,6 +54,7 @@ class DataSlice(NamedTuple):
     total_count: Optional[int] = None  # the length of the raw dataframe (without slicing)
     input_parameters: Optional[dict] = None
     stats: Optional[DataStats] = None
+    # TODO: name is kinda misleading. what others information than `columns` will it contain ?
     query_metadata: Optional[QueryMetadata] = None
 
 
@@ -444,7 +446,7 @@ class ToucanConnector(BaseModel, metaclass=ABCMeta):
         if data_source is not None:
             unique_identifier['datasource'] = self._render_datasource(data_source)
 
-        json_uid = JsonWrapper.dumps(unique_identifier, sort_keys=True)
+        json_uid = JsonWrapper.dumps(unique_identifier, sort_keys=True, default=hash)
         string_uid = str(uuid.uuid3(uuid.NAMESPACE_OID, json_uid))
         return string_uid
 

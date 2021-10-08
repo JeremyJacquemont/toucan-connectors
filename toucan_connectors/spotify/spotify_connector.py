@@ -74,6 +74,9 @@ class SpotifyConnector(ToucanConnector):
     data_source_model: SpotifyDataSource
     connection_object: SpotifyOAuth = None
 
+    class Config:
+        arbitrary_types_allowed = True
+
     def build_authorization_url(self, **kwargs):
         return self.connection_object.get_authorize_url(kwargs)
 
